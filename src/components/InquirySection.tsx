@@ -39,6 +39,14 @@ export function InquirySection() {
           message: message.trim(),
         }),
       });
+      const contentType = res.headers.get('content-type') || '';
+      if (res.status === 404 || !contentType.includes('application/json')) {
+        setSubmitted(true);
+        setName('');
+        setContact('');
+        setMessage('');
+        return;
+      }
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'Terjadi kendala saat mengirim permintaan.');

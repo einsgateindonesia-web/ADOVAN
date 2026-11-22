@@ -263,23 +263,29 @@ async function startServer() {
 
   const store = loadStore();
 
+  const sseClients = new Set<express.Response>();
+
   const getConnectedCount = () => {
     let count = 0;
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) count += 1;
     });
-    return count;
+    return Math.max(1, count + sseClients.size);
   };
 
   const broadcast = (payload: Record<string, unknown>) => {
-    const encoded = JSON.stringify({
+    const fullPayload = {
       ...payload,
       connectedClients: getConnectedCount(),
-    });
+    };
+    const encoded = JSON.stringify(fullPayload);
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(encoded);
       }
+    });
+    sseClients.forEach((res) => {
+      res.write(`data: ${encoded}\n\n`);
     });
   };
 
@@ -521,6 +527,33 @@ async function startServer() {
     });
   });
 
+  app.get('/api/population/stream', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    sseClients.add(res);
+    res.write(
+      `data: ${JSON.stringify({
+        type: 'population:init',
+        batches: store.batches,
+        events: store.events,
+        connectedClients: getConnectedCount(),
+      })}\n\n`
+    );
+
+    const heartbeat = setInterval(() => {
+      res.write(': ping\n\n');
+    }, 25_000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      sseClients.delete(res);
+      broadcast({ type: 'presence:update' });
+    });
+  });
+
   app.get('/api/population', (_req, res) => {
     res.json({
       batches: store.batches,
@@ -608,7 +641,7 @@ async function startServer() {
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);

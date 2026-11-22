@@ -210,9 +210,11 @@ export function PopulationWorkspace({
   const connectionLabel =
     connectionState === 'connected'
       ? 'Sinkronisasi Real-Time Aktif'
-      : connectionState === 'reconnecting'
-        ? 'Menghubungkan Ulang...'
-        : 'Menghubungkan ke Server...';
+      : connectionState === 'local-sync'
+        ? 'Sinkronisasi Tab Aktif'
+        : connectionState === 'reconnecting'
+          ? 'Menghubungkan Ulang...'
+          : 'Menghubungkan ke Server...';
 
   return (
     <section id="populasi" className="py-20 border-t border-slate-200 bg-white">
@@ -236,7 +238,7 @@ export function PopulationWorkspace({
             <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-lg border border-slate-200 bg-[#F8F9FA] text-xs font-medium text-slate-700 whitespace-nowrap shrink-0">
               <span
                 className={`w-2 h-2 rounded-full ${
-                  connectionState === 'connected'
+                  connectionState === 'connected' || connectionState === 'local-sync'
                     ? 'bg-emerald-600'
                     : 'bg-amber-500 animate-pulse'
                 }`}
@@ -446,37 +448,39 @@ export function PopulationWorkspace({
           {/* Right column: Live filterable kandang list & real-time activity feed */}
           <div className="lg:col-span-8 space-y-6">
             {/* Filter bar + Search */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg overflow-x-auto">
-                {(['Semua', ...PIG_PHASES] as const).map((tab) => (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setPhaseFilter(tab)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                      phaseFilter === tab
-                        ? 'bg-white text-slate-900 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-lg">
+                  {(['Semua', ...PIG_PHASES] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setPhaseFilter(tab)}
+                      className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        phaseFilter === tab
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
 
-              <div className="relative w-full md:w-56 shrink-0">
-                <Search
-                  className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                  aria-hidden="true"
-                />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari kandang atau ras..."
-                  aria-label="Cari kandang atau ras"
-                  className="w-full pl-9 pr-3 py-2 text-xs text-slate-900 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#164E38]/30 focus:border-[#164E38]"
-                />
+                <div className="relative w-full sm:w-56 shrink-0">
+                  <Search
+                    className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                    aria-hidden="true"
+                  />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Cari kandang atau ras..."
+                    aria-label="Cari kandang atau ras"
+                    className="w-full pl-9 pr-3 py-2 text-xs text-slate-900 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#164E38]/30 focus:border-[#164E38]"
+                  />
+                </div>
               </div>
             </div>
 
