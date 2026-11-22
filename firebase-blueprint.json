@@ -1,0 +1,269 @@
+{
+  "entities": {
+    "PigBatch": {
+      "title": "PigBatch",
+      "description": "Kelompok populasi babi per kandang/blok pada Bhumi Swana Farm yang disinkronkan secara real-time lintas perangkat.",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "ID workspace peternakan bersama.",
+          "minLength": 3,
+          "maxLength": 40,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "penName": {
+          "type": "string",
+          "description": "Nama kandang atau blok ternak.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "breed": {
+          "type": "string",
+          "description": "Galur atau ras babi.",
+          "enum": ["Landrace", "Yorkshire", "Duroc", "Persilangan F1"],
+          "maxLength": 32
+        },
+        "phase": {
+          "type": "string",
+          "description": "Fase pertumbuhan ternak.",
+          "enum": ["Anak Babi", "Sapihan", "Pembesaran", "Penggemukan", "Indukan", "Pejantan"],
+          "maxLength": 32
+        },
+        "count": {
+          "type": "integer",
+          "description": "Jumlah ekor babi aktif di kandang (0 - 100000)."
+        },
+        "avgWeightKg": {
+          "type": "number",
+          "description": "Bobot rata-rata per ekor dalam kilogram (0 - 1000)."
+        },
+        "healthStatus": {
+          "type": "string",
+          "description": "Status kondisi kesehatan kelompok babi.",
+          "enum": ["Sehat", "Pantauan", "Karantina", "Siap Panen"],
+          "maxLength": 24
+        },
+        "notes": {
+          "type": "string",
+          "description": "Catatan pakan, vaksinasi, atau kondisi kandang.",
+          "maxLength": 200
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "Nama petugas atau pengguna yang melakukan pembaruan terakhir.",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "updatedByUid": {
+          "type": "string",
+          "description": "UID Firebase Auth petugas yang melakukan pembaruan terakhir.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdByUid": {
+          "type": "string",
+          "description": "UID Firebase Auth pembuat dokumen awal (immutable).",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp server saat blok kandang dibuat (immutable)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp server saat blok kandang terakhir diperbarui."
+        }
+      },
+      "required": [
+        "workspaceId",
+        "penName",
+        "breed",
+        "phase",
+        "count",
+        "avgWeightKg",
+        "healthStatus",
+        "notes",
+        "updatedBy",
+        "updatedByUid",
+        "createdByUid",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PopulationEvent": {
+      "title": "PopulationEvent",
+      "description": "Catatan audit immutable setiap kali populasi kandang ditambah, diubah, atau dihapus.",
+      "type": "object",
+      "properties": {
+        "workspaceId": {
+          "type": "string",
+          "description": "ID workspace peternakan bersama.",
+          "minLength": 3,
+          "maxLength": 40,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "type": {
+          "type": "string",
+          "description": "Jenis mutasi populasi.",
+          "enum": ["create", "update", "delete"],
+          "maxLength": 16
+        },
+        "batchId": {
+          "type": "string",
+          "description": "ID dokumen batch kandang terkait.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "penName": {
+          "type": "string",
+          "description": "Nama kandang pada saat kejadian.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "breed": {
+          "type": "string",
+          "description": "Ras babi pada saat kejadian.",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "phase": {
+          "type": "string",
+          "description": "Fase ternak pada saat kejadian.",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "previousCount": {
+          "type": "integer",
+          "description": "Jumlah ekor sebelum perubahan (atau null saat pembuatan baru)."
+        },
+        "newCount": {
+          "type": "integer",
+          "description": "Jumlah ekor sesudah perubahan."
+        },
+        "delta": {
+          "type": "integer",
+          "description": "Selisih perubahan jumlah ekor."
+        },
+        "actor": {
+          "type": "string",
+          "description": "Nama petugas pelaku perubahan.",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "actorUid": {
+          "type": "string",
+          "description": "UID Firebase Auth pelaku perubahan.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp server saat peristiwa tercatat."
+        }
+      },
+      "required": [
+        "workspaceId",
+        "type",
+        "batchId",
+        "penName",
+        "breed",
+        "phase",
+        "previousCount",
+        "newCount",
+        "delta",
+        "actor",
+        "actorUid",
+        "timestamp"
+      ]
+    },
+    "Inquiry": {
+      "title": "Inquiry",
+      "description": "Permintaan konsultasi kemitraan atau pemesanan bibit dari calon mitra.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Nama lengkap atau perusahaan calon mitra.",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "contact": {
+          "type": "string",
+          "description": "Nomor WhatsApp atau email (PII).",
+          "minLength": 5,
+          "maxLength": 100
+        },
+        "topic": {
+          "type": "string",
+          "description": "Topik kebutuhan kemitraan.",
+          "minLength": 3,
+          "maxLength": 80
+        },
+        "message": {
+          "type": "string",
+          "description": "Rincian kebutuhan atau estimasi jumlah ekor.",
+          "minLength": 8,
+          "maxLength": 1000
+        },
+        "ownerId": {
+          "type": "string",
+          "description": "UID Firebase Auth pengirim permintaan.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp server saat permintaan dikirim."
+        }
+      },
+      "required": ["name", "contact", "topic", "message", "ownerId", "createdAt"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Dokumen penanda hak admin untuk pengelolaan operasional peternakan.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "Email admin terverifikasi.",
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Waktu penetapan admin."
+        }
+      },
+      "required": ["email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/batches/{batchId}": {
+      "schema": { "$ref": "#/entities/PigBatch" },
+      "description": "Koleksi blok kandang dan populasi babi aktif yang disinkronkan real-time antar perangkat."
+    },
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/PopulationEvent" },
+      "description": "Riwayat perubahan populasi real-time yang bersifat append-only (immutable)."
+    },
+    "/inquiries/{inquiryId}": {
+      "schema": { "$ref": "#/entities/Inquiry" },
+      "description": "Permintaan kemitraan berisi data kontak (PII) yang hanya dapat dibaca oleh pengirim atau admin."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Daftar UID admin terverifikasi."
+    }
+  }
+}

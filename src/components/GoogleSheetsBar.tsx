@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth';
 import {
   AlertCircle,
   Check,
+  Cloud,
   Copy,
   Download,
   ExternalLink,
@@ -20,6 +21,7 @@ interface GoogleSheetsBarProps {
   user: User | null;
   hasAccessToken: boolean;
   authBusy: boolean;
+  sheetsAuthBusy: boolean;
   unauthorizedDomain: string | null;
   onDismissUnauthorizedDomain: () => void;
   sheetInfo: SpreadsheetInfo | null;
@@ -27,6 +29,7 @@ interface GoogleSheetsBarProps {
   lastSheetSyncAt: string | null;
   prefilledSheetId: string;
   onSignIn: () => Promise<void>;
+  onAuthorizeSheets: () => Promise<void>;
   onSignOut: () => Promise<void>;
   onCreateSpreadsheet: () => Promise<void>;
   onConnectSpreadsheet: (inputUrlOrId: string) => Promise<void>;
@@ -48,6 +51,7 @@ export function GoogleSheetsBar({
   user,
   hasAccessToken,
   authBusy,
+  sheetsAuthBusy,
   unauthorizedDomain,
   onDismissUnauthorizedDomain,
   sheetInfo,
@@ -55,6 +59,7 @@ export function GoogleSheetsBar({
   lastSheetSyncAt,
   prefilledSheetId,
   onSignIn,
+  onAuthorizeSheets,
   onSignOut,
   onCreateSpreadsheet,
   onConnectSpreadsheet,
@@ -132,14 +137,21 @@ export function GoogleSheetsBar({
     <div className="mt-6 border border-slate-200 rounded-xl bg-[#F8F9FA] p-4 sm:p-5">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
-          <FileSpreadsheet className="w-5 h-5 text-[#164E38] mt-0.5 shrink-0" aria-hidden="true" />
+          {user ? (
+            <Cloud className="w-5 h-5 text-[#164E38] mt-0.5 shrink-0" aria-hidden="true" />
+          ) : (
+            <FileSpreadsheet className="w-5 h-5 text-[#164E38] mt-0.5 shrink-0" aria-hidden="true" />
+          )}
           <div>
             <h3 className="text-sm font-semibold text-slate-900">
-              Sinkronisasi Google Sheets &amp; Ekspor Spreadsheet
+              {user
+                ? 'Sinkronisasi Cloud Lintas Perangkat Aktif'
+                : 'Sinkronisasi Real-Time Lintas Perangkat & Google Sheets'}
             </h3>
             <p className="text-xs text-slate-600 mt-0.5">
-              Hubungkan ke Google Sheets bersama atau unduh file spreadsheet (.CSV) langsung untuk
-              dibuka di Google Sheets dan Excel.
+              {user
+                ? 'Setiap pembaruan angka langsung tersinkron otomatis ke semua HP, tablet, dan laptop yang membuka halaman ini.'
+                : 'Masuk dengan akun Google apa saja di HP atau perangkat lain agar seluruh tim melihat dan mengubah angka populasi yang sama secara real-time.'}
             </p>
           </div>
         </div>
@@ -155,7 +167,7 @@ export function GoogleSheetsBar({
             <span>Unduh CSV</span>
           </button>
 
-          {!hasAccessToken ? (
+          {!user ? (
             <button
               type="button"
               disabled={authBusy}
@@ -180,14 +192,14 @@ export function GoogleSheetsBar({
                   d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
                 />
               </svg>
-              <span>{authBusy ? 'Menghubungkan...' : 'Sign in with Google'}</span>
+              <span>{authBusy ? 'Menghubungkan...' : 'Masuk dengan Google'}</span>
             </button>
           ) : (
-            <div className="flex items-center gap-2.5">
-              <span className="text-xs text-slate-600 truncate max-w-48">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="text-xs text-slate-600 truncate max-w-52">
                 Terhubung:{' '}
                 <strong className="text-slate-900">
-                  {user?.email || user?.displayName || 'Akun Google Aktif'}
+                  {user.email || user.displayName || 'Akun Google Aktif'}
                 </strong>
               </span>
               <button
@@ -214,7 +226,7 @@ export function GoogleSheetsBar({
                   Domain pratinjau belum diizinkan di Firebase Authentication
                 </p>
                 <p className="text-amber-900 leading-relaxed">
-                  Agar tombol <strong>Sign in with Google</strong> diizinkan oleh Google pada alamat
+                  Agar tombol <strong>Masuk dengan Google</strong> diizinkan oleh Google pada alamat
                   ini, tambahkan domain berikut ke{' '}
                   <strong>Authentication → Settings → Authorized domains</strong> di Firebase Console:
                 </p>
@@ -262,10 +274,31 @@ export function GoogleSheetsBar({
         </div>
       )}
 
-      {/* Connected spreadsheet toolbar or link/create input */}
-      {hasAccessToken && (
+      {/* Optional Google Sheets integration row (only visible once signed in) */}
+      {user && (
         <div className="mt-4 pt-4 border-t border-slate-200">
-          {!sheetInfo ? (
+          {!hasAccessToken ? (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-2 text-xs text-slate-600">
+                <FileSpreadsheet className="w-4 h-4 text-[#164E38] mt-0.5 shrink-0" aria-hidden="true" />
+                <span>
+                  Ingin menyinkronkan juga ke <strong>Google Sheets</strong> pribadi/perusahaan?{' '}
+                  <span className="text-slate-500">
+                    (Opsional — khusus akun pemilik / Test User yang terdaftar di Google Cloud Console.)
+                  </span>
+                </span>
+              </div>
+              <button
+                type="button"
+                disabled={sheetsAuthBusy}
+                onClick={onAuthorizeSheets}
+                className="inline-flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-medium text-[#164E38] bg-white border border-[#164E38]/40 hover:bg-emerald-50 disabled:opacity-60 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>{sheetsAuthBusy ? 'Meminta Izin...' : 'Hubungkan Google Sheets'}</span>
+              </button>
+            </div>
+          ) : !sheetInfo ? (
             <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
               <form
                 onSubmit={(e) => {

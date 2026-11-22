@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { auth } from '../lib/firebaseAuth';
+import { saveInquiryInFirestore } from '../lib/firestoreDb';
 
 export function InquirySection() {
   const [name, setName] = useState('');
@@ -29,15 +31,26 @@ export function InquirySection() {
 
     setSubmitting(true);
     try {
+      const payload = {
+        name: name.trim(),
+        contact: contact.trim(),
+        topic,
+        message: message.trim(),
+      };
+
+      if (auth.currentUser && auth.currentUser.emailVerified) {
+        await saveInquiryInFirestore(auth.currentUser, payload);
+        setSubmitted(true);
+        setName('');
+        setContact('');
+        setMessage('');
+        return;
+      }
+
       const res = await fetch('/api/inquiries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          contact: contact.trim(),
-          topic,
-          message: message.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
       const contentType = res.headers.get('content-type') || '';
       if (res.status === 404 || !contentType.includes('application/json')) {

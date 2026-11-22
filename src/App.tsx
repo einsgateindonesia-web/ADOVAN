@@ -49,6 +49,7 @@ export default function App() {
     user,
     hasAccessToken,
     authBusy,
+    sheetsAuthBusy,
     unauthorizedDomain,
     dismissUnauthorizedDomain,
     sheetInfo,
@@ -60,6 +61,7 @@ export default function App() {
     cancelConfirmation,
     proceedConfirmation,
     signInGoogle,
+    authorizeSheets,
     signOutGoogle,
     createNewSheet,
     connectExistingSheet,
@@ -330,6 +332,7 @@ export default function App() {
           user={user}
           hasAccessToken={hasAccessToken}
           authBusy={authBusy}
+          sheetsAuthBusy={sheetsAuthBusy}
           unauthorizedDomain={unauthorizedDomain}
           onDismissUnauthorizedDomain={dismissUnauthorizedDomain}
           sheetInfo={sheetInfo}
@@ -341,6 +344,7 @@ export default function App() {
           onCancelConfirmation={cancelConfirmation}
           onProceedConfirmation={proceedConfirmation}
           onSignInGoogle={signInGoogle}
+          onAuthorizeSheets={authorizeSheets}
           onSignOutGoogle={signOutGoogle}
           onCreateNewSheet={createNewSheet}
           onConnectExistingSheet={connectExistingSheet}

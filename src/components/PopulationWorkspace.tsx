@@ -50,6 +50,7 @@ interface PopulationWorkspaceProps {
   user: User | null;
   hasAccessToken: boolean;
   authBusy: boolean;
+  sheetsAuthBusy: boolean;
   unauthorizedDomain: string | null;
   onDismissUnauthorizedDomain: () => void;
   sheetInfo: SpreadsheetInfo | null;
@@ -61,6 +62,7 @@ interface PopulationWorkspaceProps {
   onCancelConfirmation: () => void;
   onProceedConfirmation: () => void;
   onSignInGoogle: () => Promise<void>;
+  onAuthorizeSheets: () => Promise<void>;
   onSignOutGoogle: () => Promise<void>;
   onCreateNewSheet: () => Promise<void>;
   onConnectExistingSheet: (urlOrId: string) => Promise<void>;
@@ -95,6 +97,7 @@ export function PopulationWorkspace({
   user,
   hasAccessToken,
   authBusy,
+  sheetsAuthBusy,
   unauthorizedDomain,
   onDismissUnauthorizedDomain,
   sheetInfo,
@@ -106,6 +109,7 @@ export function PopulationWorkspace({
   onCancelConfirmation,
   onProceedConfirmation,
   onSignInGoogle,
+  onAuthorizeSheets,
   onSignOutGoogle,
   onCreateNewSheet,
   onConnectExistingSheet,
@@ -276,13 +280,15 @@ export function PopulationWorkspace({
   const connectionLabel =
     connectionState === 'sheets-synced'
       ? 'Sinkronisasi Google Sheets Aktif'
-      : connectionState === 'connected'
-        ? 'Sinkronisasi Real-Time Aktif'
-        : connectionState === 'local-sync'
-          ? 'Sinkronisasi Tab Aktif'
-          : connectionState === 'reconnecting'
-            ? 'Menghubungkan Ulang...'
-            : 'Menghubungkan ke Server...';
+      : connectionState === 'cloud-synced'
+        ? 'Sinkronisasi Cloud Real-Time Aktif'
+        : connectionState === 'connected'
+          ? 'Sinkronisasi Server Real-Time Aktif'
+          : connectionState === 'local-sync'
+            ? 'Sinkronisasi Tab Aktif'
+            : connectionState === 'reconnecting'
+              ? 'Menghubungkan Ulang...'
+              : 'Menghubungkan ke Server...';
 
   return (
     <section id="populasi" className="py-20 border-t border-slate-200 bg-white">
@@ -307,6 +313,7 @@ export function PopulationWorkspace({
               <span
                 className={`w-2 h-2 rounded-full ${
                   connectionState === 'connected' ||
+                  connectionState === 'cloud-synced' ||
                   connectionState === 'sheets-synced' ||
                   connectionState === 'local-sync'
                     ? 'bg-emerald-600'
@@ -347,6 +354,7 @@ export function PopulationWorkspace({
           user={user}
           hasAccessToken={hasAccessToken}
           authBusy={authBusy}
+          sheetsAuthBusy={sheetsAuthBusy}
           unauthorizedDomain={unauthorizedDomain}
           onDismissUnauthorizedDomain={onDismissUnauthorizedDomain}
           sheetInfo={sheetInfo}
@@ -354,6 +362,7 @@ export function PopulationWorkspace({
           lastSheetSyncAt={lastSheetSyncAt}
           prefilledSheetId={prefilledSheetId}
           onSignIn={onSignInGoogle}
+          onAuthorizeSheets={onAuthorizeSheets}
           onSignOut={onSignOutGoogle}
           onCreateSpreadsheet={onCreateNewSheet}
           onConnectSpreadsheet={onConnectExistingSheet}

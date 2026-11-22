@@ -1,0 +1,245 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Hardened Primitives ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isEmailVerified() && (
+        request.auth.token.email == 'einsgateindonesia@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidWorkspaceId(val) {
+      return val is string && val.size() >= 3 && val.size() <= 40 &&
+        val.matches('^[a-zA-Z0-9_\\-]+$') && val == 'bhumi-swana-main';
+    }
+
+    function isValidBreed(val) {
+      return val is string && val.size() >= 1 && val.size() <= 32 &&
+        val in ['Landrace', 'Yorkshire', 'Duroc', 'Persilangan F1'];
+    }
+
+    function isValidPhase(val) {
+      return val is string && val.size() >= 1 && val.size() <= 32 &&
+        val in ['Anak Babi', 'Sapihan', 'Pembesaran', 'Penggemukan', 'Indukan', 'Pejantan'];
+    }
+
+    function isValidHealthStatus(val) {
+      return val is string && val.size() >= 1 && val.size() <= 24 &&
+        val in ['Sehat', 'Pantauan', 'Karantina', 'Siap Panen'];
+    }
+
+    // --- Validation Blueprints ---
+    function isValidBatch(data) {
+      return data.keys().hasAll([
+          'workspaceId',
+          'penName',
+          'breed',
+          'phase',
+          'count',
+          'avgWeightKg',
+          'healthStatus',
+          'notes',
+          'updatedBy',
+          'updatedByUid',
+          'createdByUid',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'workspaceId',
+          'penName',
+          'breed',
+          'phase',
+          'count',
+          'avgWeightKg',
+          'healthStatus',
+          'notes',
+          'updatedBy',
+          'updatedByUid',
+          'createdByUid',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidWorkspaceId(data.workspaceId) &&
+        data.penName is string && data.penName.size() >= 1 && data.penName.size() <= 80 &&
+        isValidBreed(data.breed) &&
+        isValidPhase(data.phase) &&
+        data.count is int && data.count >= 0 && data.count <= 100000 &&
+        (data.avgWeightKg is int || data.avgWeightKg is float) &&
+        data.avgWeightKg >= 0 && data.avgWeightKg <= 1000 &&
+        isValidHealthStatus(data.healthStatus) &&
+        data.notes is string && data.notes.size() <= 200 &&
+        data.updatedBy is string && data.updatedBy.size() >= 1 && data.updatedBy.size() <= 60 &&
+        isValidId(data.updatedByUid) &&
+        isValidId(data.createdByUid) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidEvent(data) {
+      return data.keys().hasAll([
+          'workspaceId',
+          'type',
+          'batchId',
+          'penName',
+          'breed',
+          'phase',
+          'previousCount',
+          'newCount',
+          'delta',
+          'actor',
+          'actorUid',
+          'timestamp'
+        ]) &&
+        data.keys().hasOnly([
+          'workspaceId',
+          'type',
+          'batchId',
+          'penName',
+          'breed',
+          'phase',
+          'previousCount',
+          'newCount',
+          'delta',
+          'actor',
+          'actorUid',
+          'timestamp'
+        ]) &&
+        isValidWorkspaceId(data.workspaceId) &&
+        data.type is string && data.type.size() >= 1 && data.type.size() <= 16 &&
+        data.type in ['create', 'update', 'delete'] &&
+        isValidId(data.batchId) &&
+        data.penName is string && data.penName.size() >= 1 && data.penName.size() <= 80 &&
+        data.breed is string && data.breed.size() >= 1 && data.breed.size() <= 32 &&
+        data.phase is string && data.phase.size() >= 1 && data.phase.size() <= 32 &&
+        (data.previousCount == null || (data.previousCount is int && data.previousCount >= 0 && data.previousCount <= 100000)) &&
+        data.newCount is int && data.newCount >= 0 && data.newCount <= 100000 &&
+        data.delta is int && data.delta >= -100000 && data.delta <= 100000 &&
+        data.actor is string && data.actor.size() >= 1 && data.actor.size() <= 60 &&
+        isValidId(data.actorUid) &&
+        data.timestamp is timestamp;
+    }
+
+    function isValidInquiry(data) {
+      return data.keys().hasAll(['name', 'contact', 'topic', 'message', 'ownerId', 'createdAt']) &&
+        data.keys().hasOnly(['name', 'contact', 'topic', 'message', 'ownerId', 'createdAt']) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
+        data.contact is string && data.contact.size() >= 5 && data.contact.size() <= 100 &&
+        data.topic is string && data.topic.size() >= 3 && data.topic.size() <= 80 &&
+        data.message is string && data.message.size() >= 8 && data.message.size() <= 1000 &&
+        isValidId(data.ownerId) &&
+        data.createdAt is timestamp;
+    }
+
+    // --- Collection: /batches/{batchId} ---
+    match /batches/{batchId} {
+      allow get: if isValidId(batchId) && isEmailVerified() &&
+        existing().workspaceId == 'bhumi-swana-main';
+
+      allow list: if isEmailVerified() &&
+        resource.data.workspaceId == 'bhumi-swana-main';
+
+      allow create: if isValidId(batchId) && isEmailVerified() &&
+        isValidBatch(incoming()) &&
+        incoming().createdByUid == request.auth.uid &&
+        incoming().updatedByUid == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isEmailVerified() &&
+        isValidId(batchId) &&
+        isValidBatch(incoming()) &&
+        existing().workspaceId == 'bhumi-swana-main' &&
+        incoming().workspaceId == existing().workspaceId &&
+        incoming().createdByUid == existing().createdByUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedByUid == request.auth.uid &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['count', 'updatedAt', 'updatedBy', 'updatedByUid']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'penName',
+            'breed',
+            'phase',
+            'count',
+            'avgWeightKg',
+            'healthStatus',
+            'notes',
+            'updatedAt',
+            'updatedBy',
+            'updatedByUid'
+          ])
+        );
+
+      allow delete: if isValidId(batchId) && isEmailVerified() &&
+        existing().workspaceId == 'bhumi-swana-main' &&
+        (existing().createdByUid == request.auth.uid || isAdmin());
+    }
+
+    // --- Collection: /events/{eventId} ---
+    match /events/{eventId} {
+      allow get: if isValidId(eventId) && isEmailVerified() &&
+        existing().workspaceId == 'bhumi-swana-main';
+
+      allow list: if isEmailVerified() &&
+        resource.data.workspaceId == 'bhumi-swana-main';
+
+      allow create: if isValidId(eventId) && isEmailVerified() &&
+        isValidEvent(incoming()) &&
+        incoming().actorUid == request.auth.uid &&
+        incoming().timestamp == request.time;
+
+      allow update, delete: if false;
+    }
+
+    // --- Collection: /inquiries/{inquiryId} (PII Isolated) ---
+    match /inquiries/{inquiryId} {
+      allow get: if isValidId(inquiryId) && isEmailVerified() &&
+        (existing().ownerId == request.auth.uid || isAdmin());
+
+      allow list: if isEmailVerified() &&
+        (resource.data.ownerId == request.auth.uid || isAdmin());
+
+      allow create: if isValidId(inquiryId) && isEmailVerified() &&
+        isValidInquiry(incoming()) &&
+        incoming().ownerId == request.auth.uid &&
+        incoming().createdAt == request.time;
+
+      allow update, delete: if false;
+    }
+
+    // --- Collection: /admins/{adminId} ---
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && isEmailVerified() &&
+        request.auth.uid == adminId;
+      allow list, write: if false;
+    }
+  }
+}
