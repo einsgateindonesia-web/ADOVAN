@@ -52,6 +52,7 @@ export interface UpdateBatchInput {
   breed?: PigBreed;
   phase?: PigPhase;
   count?: number;
+  delta?: number;
   avgWeightKg?: number;
   healthStatus?: HealthStatus;
   notes?: string;

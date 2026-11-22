@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { User } from 'firebase/auth';
 import {
   Activity,
   AlertCircle,
@@ -12,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import type { ConnectionState } from '../hooks/useRealtimePopulation';
+import type { SpreadsheetInfo } from '../lib/googleSheets';
 import {
   HEALTH_STATUSES,
   PIG_BREEDS,
@@ -24,6 +26,11 @@ import {
   type PopulationEvent,
   type UpdateBatchInput,
 } from '../types/population';
+import {
+  ConfirmMutationModal,
+  type PendingSheetConfirmation,
+} from './ConfirmMutationModal';
+import { GoogleSheetsBar } from './GoogleSheetsBar';
 
 interface PopulationWorkspaceProps {
   batches: PigBatch[];
@@ -39,6 +46,25 @@ interface PopulationWorkspaceProps {
     input: UpdateBatchInput
   ) => Promise<{ ok: boolean; error?: string }>;
   onRemoveBatch: (id: string, actor: string) => Promise<{ ok: boolean; error?: string }>;
+  // Google Sheets props
+  user: User | null;
+  hasAccessToken: boolean;
+  authBusy: boolean;
+  sheetInfo: SpreadsheetInfo | null;
+  sheetBusy: boolean;
+  lastSheetSyncAt: string | null;
+  prefilledSheetId: string;
+  pendingConfirmation: PendingSheetConfirmation | null;
+  confirmBusy: boolean;
+  onCancelConfirmation: () => void;
+  onProceedConfirmation: () => void;
+  onSignInGoogle: () => Promise<void>;
+  onSignOutGoogle: () => Promise<void>;
+  onCreateNewSheet: () => Promise<void>;
+  onConnectExistingSheet: (urlOrId: string) => Promise<void>;
+  onChangeActiveTab: (tabName: string) => Promise<void>;
+  onSyncSheetNow: () => Promise<void>;
+  onDisconnectSheet: () => void;
 }
 
 function formatTime(iso: string): string {
@@ -64,6 +90,24 @@ export function PopulationWorkspace({
   onAddBatch,
   onUpdateBatch,
   onRemoveBatch,
+  user,
+  hasAccessToken,
+  authBusy,
+  sheetInfo,
+  sheetBusy,
+  lastSheetSyncAt,
+  prefilledSheetId,
+  pendingConfirmation,
+  confirmBusy,
+  onCancelConfirmation,
+  onProceedConfirmation,
+  onSignInGoogle,
+  onSignOutGoogle,
+  onCreateNewSheet,
+  onConnectExistingSheet,
+  onChangeActiveTab,
+  onSyncSheetNow,
+  onDisconnectSheet,
 }: PopulationWorkspaceProps) {
   const [actorName, setActorName] = useState<string>('Petugas Kandang');
   const [phaseFilter, setPhaseFilter] = useState<'Semua' | PigPhase>('Semua');
@@ -83,8 +127,9 @@ export function PopulationWorkspace({
     text: string;
   } | null>(null);
 
-  // Per-row quick count draft & editing state
+  // Per-row quick count draft & editing state (auto-synced with remote updates)
   const [countDrafts, setCountDrafts] = useState<Record<string, string>>({});
+  const focusedCountIdRef = useRef<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<{
     phase: PigPhase;
@@ -93,6 +138,21 @@ export function PopulationWorkspace({
     notes: string;
   } | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Keep every non-focused row count synchronized with the authoritative state
+  useEffect(() => {
+    setCountDrafts((prev) => {
+      const next: Record<string, string> = {};
+      for (const b of batches) {
+        if (focusedCountIdRef.current === b.id && prev[b.id] !== undefined) {
+          next[b.id] = prev[b.id];
+        } else {
+          next[b.id] = String(b.count);
+        }
+      }
+      return next;
+    });
+  }, [batches]);
 
   const filteredBatches = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -142,12 +202,14 @@ export function PopulationWorkspace({
       avgWeightKg: parsedWeight,
       healthStatus,
       notes: notes.trim(),
-      actor: actorName.trim() || 'Petugas Kandang',
+      actor: user?.displayName || actorName.trim() || 'Petugas Kandang',
     });
     setSubmitting(false);
 
     if (!res.ok) {
-      setFormFeedback({ type: 'error', text: res.error || 'Gagal menyimpan kandang.' });
+      if (res.error) {
+        setFormFeedback({ type: 'error', text: res.error });
+      }
       return;
     }
 
@@ -155,17 +217,16 @@ export function PopulationWorkspace({
     setNotes('');
     setFormFeedback({
       type: 'success',
-      text: `Data "${trimmedPen}" berhasil ditambahkan dan disinkronkan real-time.`,
+      text: `Data "${trimmedPen}" berhasil ditambahkan dan disinkronkan.`,
     });
   };
 
   const handleQuickDelta = async (batch: PigBatch, delta: number) => {
-    const nextCount = Math.max(0, batch.count + delta);
-    if (nextCount === batch.count) return;
-    setCountDrafts((prev) => ({ ...prev, [batch.id]: String(nextCount) }));
+    if (batch.count + delta < 0 && batch.count === 0) return;
+    focusedCountIdRef.current = null;
     await onUpdateBatch(batch.id, {
-      count: nextCount,
-      actor: actorName.trim() || 'Petugas Kandang',
+      delta,
+      actor: user?.displayName || actorName.trim() || 'Petugas Kandang',
     });
   };
 
@@ -174,9 +235,10 @@ export function PopulationWorkspace({
     if (raw === undefined) return;
     const parsed = Number(raw);
     if (!Number.isInteger(parsed) || parsed < 0 || parsed > 100_000) return;
+    focusedCountIdRef.current = null;
     await onUpdateBatch(batch.id, {
       count: parsed,
-      actor: actorName.trim() || 'Petugas Kandang',
+      actor: user?.displayName || actorName.trim() || 'Petugas Kandang',
     });
   };
 
@@ -199,7 +261,7 @@ export function PopulationWorkspace({
       avgWeightKg: parsedWeight,
       healthStatus: editDraft.healthStatus,
       notes: editDraft.notes.trim(),
-      actor: actorName.trim() || 'Petugas Kandang',
+      actor: user?.displayName || actorName.trim() || 'Petugas Kandang',
     });
     if (res.ok) {
       setEditingId(null);
@@ -208,13 +270,15 @@ export function PopulationWorkspace({
   };
 
   const connectionLabel =
-    connectionState === 'connected'
-      ? 'Sinkronisasi Real-Time Aktif'
-      : connectionState === 'local-sync'
-        ? 'Sinkronisasi Tab Aktif'
-        : connectionState === 'reconnecting'
-          ? 'Menghubungkan Ulang...'
-          : 'Menghubungkan ke Server...';
+    connectionState === 'sheets-synced'
+      ? 'Sinkronisasi Google Sheets Aktif'
+      : connectionState === 'connected'
+        ? 'Sinkronisasi Real-Time Aktif'
+        : connectionState === 'local-sync'
+          ? 'Sinkronisasi Tab Aktif'
+          : connectionState === 'reconnecting'
+            ? 'Menghubungkan Ulang...'
+            : 'Menghubungkan ke Server...';
 
   return (
     <section id="populasi" className="py-20 border-t border-slate-200 bg-white">
@@ -229,8 +293,8 @@ export function PopulationWorkspace({
               Input &amp; Update Populasi Babi Secara Real-Time
             </h2>
             <p className="mt-3 text-base text-slate-600 leading-relaxed">
-              Setiap penambahan kandang baru atau penyesuaian jumlah ekor langsung tersimpan di server
-              dan tersinkron otomatis ke seluruh perangkat tim kandang yang sedang terbuka.
+              Setiap penambahan kandang baru atau penyesuaian jumlah ekor langsung tersinkron
+              otomatis antar perangkat dan dapat dihubungkan ke Google Sheets bersama.
             </p>
           </div>
 
@@ -238,7 +302,9 @@ export function PopulationWorkspace({
             <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-lg border border-slate-200 bg-[#F8F9FA] text-xs font-medium text-slate-700 whitespace-nowrap shrink-0">
               <span
                 className={`w-2 h-2 rounded-full ${
-                  connectionState === 'connected' || connectionState === 'local-sync'
+                  connectionState === 'connected' ||
+                  connectionState === 'sheets-synced' ||
+                  connectionState === 'local-sync'
                     ? 'bg-emerald-600'
                     : 'bg-amber-500 animate-pulse'
                 }`}
@@ -271,6 +337,24 @@ export function PopulationWorkspace({
           </div>
         </div>
 
+        {/* Google Sheets Sync Bar */}
+        <GoogleSheetsBar
+          user={user}
+          hasAccessToken={hasAccessToken}
+          authBusy={authBusy}
+          sheetInfo={sheetInfo}
+          sheetBusy={sheetBusy}
+          lastSheetSyncAt={lastSheetSyncAt}
+          prefilledSheetId={prefilledSheetId}
+          onSignIn={onSignInGoogle}
+          onSignOut={onSignOutGoogle}
+          onCreateSpreadsheet={onCreateNewSheet}
+          onConnectSpreadsheet={onConnectExistingSheet}
+          onChangeActiveTab={onChangeActiveTab}
+          onSyncNow={onSyncSheetNow}
+          onDisconnectSheet={onDisconnectSheet}
+        />
+
         {errorMessage && (
           <div
             role="alert"
@@ -283,7 +367,7 @@ export function PopulationWorkspace({
             <button
               type="button"
               onClick={onClearError}
-              className="text-xs font-medium underline hover:no-underline whitespace-nowrap shrink-0"
+              className="text-xs font-medium underline hover:no-underline whitespace-nowrap shrink-0 cursor-pointer"
             >
               Tutup
             </button>
@@ -487,7 +571,11 @@ export function PopulationWorkspace({
             {/* Summary inline line */}
             <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-200 pb-3">
               <span>
-                Menampilkan <strong className="text-slate-900 font-mono tabular-nums">{filteredBatches.length}</strong> blok kandang
+                Menampilkan{' '}
+                <strong className="text-slate-900 font-mono tabular-nums">
+                  {filteredBatches.length}
+                </strong>{' '}
+                blok kandang
               </span>
               <span>
                 Subtotal filter:{' '}
@@ -586,6 +674,14 @@ export function PopulationWorkspace({
                                 max={100000}
                                 aria-label={`Jumlah ekor di ${batch.penName}`}
                                 value={draftValue}
+                                onFocus={() => {
+                                  focusedCountIdRef.current = batch.id;
+                                }}
+                                onBlur={() => {
+                                  if (focusedCountIdRef.current === batch.id) {
+                                    focusedCountIdRef.current = null;
+                                  }
+                                }}
                                 onChange={(e) =>
                                   setCountDrafts((prev) => ({
                                     ...prev,
@@ -648,7 +744,10 @@ export function PopulationWorkspace({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    onRemoveBatch(batch.id, actorName.trim() || 'Petugas Kandang');
+                                    onRemoveBatch(
+                                      batch.id,
+                                      user?.displayName || actorName.trim() || 'Petugas Kandang'
+                                    );
                                     setConfirmDeleteId(null);
                                   }}
                                   className="h-9 px-2.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
@@ -837,6 +936,14 @@ export function PopulationWorkspace({
           </div>
         </div>
       </div>
+
+      {/* Explicit confirmation dialog before any Google Sheets mutation */}
+      <ConfirmMutationModal
+        pending={pendingConfirmation}
+        busy={confirmBusy}
+        onCancel={onCancelConfirmation}
+        onProceed={onProceedConfirmation}
+      />
     </section>
   );
 }

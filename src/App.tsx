@@ -46,6 +46,24 @@ export default function App() {
     addBatch,
     updateBatch,
     removeBatch,
+    user,
+    hasAccessToken,
+    authBusy,
+    sheetInfo,
+    sheetBusy,
+    lastSheetSyncAt,
+    prefilledSheetId,
+    pendingConfirmation,
+    confirmBusy,
+    cancelConfirmation,
+    proceedConfirmation,
+    signInGoogle,
+    signOutGoogle,
+    createNewSheet,
+    connectExistingSheet,
+    changeActiveTab,
+    syncSheetNow,
+    disconnectSheet,
   } = useRealtimePopulation();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -307,6 +325,24 @@ export default function App() {
           onAddBatch={addBatch}
           onUpdateBatch={updateBatch}
           onRemoveBatch={removeBatch}
+          user={user}
+          hasAccessToken={hasAccessToken}
+          authBusy={authBusy}
+          sheetInfo={sheetInfo}
+          sheetBusy={sheetBusy}
+          lastSheetSyncAt={lastSheetSyncAt}
+          prefilledSheetId={prefilledSheetId}
+          pendingConfirmation={pendingConfirmation}
+          confirmBusy={confirmBusy}
+          onCancelConfirmation={cancelConfirmation}
+          onProceedConfirmation={proceedConfirmation}
+          onSignInGoogle={signInGoogle}
+          onSignOutGoogle={signOutGoogle}
+          onCreateNewSheet={createNewSheet}
+          onConnectExistingSheet={connectExistingSheet}
+          onChangeActiveTab={changeActiveTab}
+          onSyncSheetNow={syncSheetNow}
+          onDisconnectSheet={disconnectSheet}
         />
 
         {/* Core Capabilities Bento Grid */}

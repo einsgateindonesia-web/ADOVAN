@@ -75,6 +75,38 @@ const VALID_HEALTH: HealthStatus[] = ['Sehat', 'Pantauan', 'Karantina', 'Siap Pa
 const DATA_DIR = path.resolve(__dirname, 'data');
 const POPULATION_FILE = path.join(DATA_DIR, 'population.json');
 const INQUIRIES_FILE = path.join(DATA_DIR, 'inquiries.json');
+const SHARED_SHEET_FILE = path.join(DATA_DIR, 'shared-sheet.json');
+
+interface SharedSheetMeta {
+  spreadsheetId: string;
+  title: string;
+  activeSheetName: string;
+  updatedAt: string;
+}
+
+function loadSharedSheet(): SharedSheetMeta | null {
+  ensureDataDir();
+  if (!fs.existsSync(SHARED_SHEET_FILE)) return null;
+  try {
+    const raw = fs.readFileSync(SHARED_SHEET_FILE, 'utf-8');
+    const parsed = JSON.parse(raw) as SharedSheetMeta;
+    if (parsed && typeof parsed.spreadsheetId === 'string' && parsed.spreadsheetId) {
+      return parsed;
+    }
+  } catch {
+    // ignore corrupt file
+  }
+  return null;
+}
+
+function saveSharedSheet(meta: SharedSheetMeta | null): void {
+  ensureDataDir();
+  if (!meta) {
+    if (fs.existsSync(SHARED_SHEET_FILE)) fs.unlinkSync(SHARED_SHEET_FILE);
+    return;
+  }
+  fs.writeFileSync(SHARED_SHEET_FILE, JSON.stringify(meta, null, 2), 'utf-8');
+}
 
 function createSeedStore(): PopulationStore {
   const now = Date.now();
@@ -363,7 +395,16 @@ async function startServer() {
 
     const existing = store.batches[idx];
     const actor = sanitizeText(input.actor, 40) || 'Peternak Aktif';
-    const nextCount = input.count !== undefined ? Number(input.count) : existing.count;
+    let nextCount = existing.count;
+    if (input.delta !== undefined) {
+      const deltaNum = Number(input.delta);
+      if (!Number.isInteger(deltaNum) || Math.abs(deltaNum) > 100_000) {
+        return { error: 'Perubahan jumlah ekor tidak valid.', status: 400 };
+      }
+      nextCount = Math.max(0, existing.count + deltaNum);
+    } else if (input.count !== undefined) {
+      nextCount = Number(input.count);
+    }
     const nextWeight =
       input.avgWeightKg !== undefined ? Number(input.avgWeightKg) : existing.avgWeightKg;
     const nextPenName =
@@ -635,6 +676,31 @@ async function startServer() {
     };
     saveInquiry(inquiry);
     res.status(201).json({ ok: true, inquiry });
+  });
+
+  app.get('/api/shared-sheet', (_req, res) => {
+    res.json({ sheet: loadSharedSheet() });
+  });
+
+  app.post('/api/shared-sheet', (req, res) => {
+    const spreadsheetId = sanitizeText(req.body?.spreadsheetId, 128);
+    const title = sanitizeText(req.body?.title, 120);
+    const activeSheetName = sanitizeText(req.body?.activeSheetName, 120);
+    if (!spreadsheetId) {
+      saveSharedSheet(null);
+      broadcast({ type: 'sheet:updated', sheet: null });
+      res.json({ sheet: null });
+      return;
+    }
+    const meta: SharedSheetMeta = {
+      spreadsheetId,
+      title: title || 'Spreadsheet Populasi',
+      activeSheetName: activeSheetName || 'Populasi_Kandang',
+      updatedAt: new Date().toISOString(),
+    };
+    saveSharedSheet(meta);
+    broadcast({ type: 'sheet:updated', sheet: meta });
+    res.json({ sheet: meta });
   });
 
   const isProd = process.env.NODE_ENV === 'production';
