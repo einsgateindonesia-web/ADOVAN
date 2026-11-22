@@ -116,6 +116,16 @@ export function PopulationWorkspace({
   } | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!user) return;
+    const googleName = user.displayName || user.email?.split('@')[0];
+    if (googleName) {
+      setActorName((prev) => (prev === 'Petugas Kandang' || !prev.trim() ? googleName : prev));
+    }
+  }, [user]);
+
+  const resolvedActor = actorName.trim() || user?.displayName || 'Petugas Kandang';
+
   // Keep every non-focused row count synchronized with the authoritative state
   useEffect(() => {
     setCountDrafts((prev) => {
@@ -179,7 +189,7 @@ export function PopulationWorkspace({
       avgWeightKg: parsedWeight,
       healthStatus,
       notes: notes.trim(),
-      actor: user?.displayName || actorName.trim() || 'Petugas Kandang',
+      actor: resolvedActor,
     });
     setSubmitting(false);
 
@@ -203,7 +213,7 @@ export function PopulationWorkspace({
     focusedCountIdRef.current = null;
     await onUpdateBatch(batch.id, {
       delta,
-      actor: user?.displayName || actorName.trim() || 'Petugas Kandang',
+      actor: resolvedActor,
     });
   };
 
@@ -215,7 +225,7 @@ export function PopulationWorkspace({
     focusedCountIdRef.current = null;
     await onUpdateBatch(batch.id, {
       count: parsed,
-      actor: user?.displayName || actorName.trim() || 'Petugas Kandang',
+      actor: resolvedActor,
     });
   };
 
@@ -238,7 +248,7 @@ export function PopulationWorkspace({
       avgWeightKg: parsedWeight,
       healthStatus: editDraft.healthStatus,
       notes: editDraft.notes.trim(),
-      actor: user?.displayName || actorName.trim() || 'Petugas Kandang',
+      actor: resolvedActor,
     });
     if (res.ok) {
       setEditingId(null);
@@ -715,10 +725,7 @@ export function PopulationWorkspace({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    onRemoveBatch(
-                                      batch.id,
-                                      user?.displayName || actorName.trim() || 'Petugas Kandang'
-                                    );
+                                    onRemoveBatch(batch.id, resolvedActor);
                                     setConfirmDeleteId(null);
                                   }}
                                   className="h-9 px-2.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer"
