@@ -47,27 +47,14 @@ export default function App() {
     updateBatch,
     removeBatch,
     user,
-    hasAccessToken,
     authBusy,
-    sheetsAuthBusy,
     unauthorizedDomain,
     dismissUnauthorizedDomain,
-    sheetInfo,
-    sheetBusy,
-    lastSheetSyncAt,
-    prefilledSheetId,
-    pendingConfirmation,
-    confirmBusy,
-    cancelConfirmation,
-    proceedConfirmation,
+    authFailure,
+    dismissAuthFailure,
+    openAuthHelpModal,
     signInGoogle,
-    authorizeSheets,
     signOutGoogle,
-    createNewSheet,
-    connectExistingSheet,
-    changeActiveTab,
-    syncSheetNow,
-    disconnectSheet,
   } = useRealtimePopulation();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -330,27 +317,14 @@ export default function App() {
           onUpdateBatch={updateBatch}
           onRemoveBatch={removeBatch}
           user={user}
-          hasAccessToken={hasAccessToken}
           authBusy={authBusy}
-          sheetsAuthBusy={sheetsAuthBusy}
           unauthorizedDomain={unauthorizedDomain}
           onDismissUnauthorizedDomain={dismissUnauthorizedDomain}
-          sheetInfo={sheetInfo}
-          sheetBusy={sheetBusy}
-          lastSheetSyncAt={lastSheetSyncAt}
-          prefilledSheetId={prefilledSheetId}
-          pendingConfirmation={pendingConfirmation}
-          confirmBusy={confirmBusy}
-          onCancelConfirmation={cancelConfirmation}
-          onProceedConfirmation={proceedConfirmation}
+          authFailure={authFailure}
+          onDismissAuthFailure={dismissAuthFailure}
+          onOpenAuthHelp={openAuthHelpModal}
           onSignInGoogle={signInGoogle}
-          onAuthorizeSheets={authorizeSheets}
           onSignOutGoogle={signOutGoogle}
-          onCreateNewSheet={createNewSheet}
-          onConnectExistingSheet={connectExistingSheet}
-          onChangeActiveTab={changeActiveTab}
-          onSyncSheetNow={syncSheetNow}
-          onDisconnectSheet={disconnectSheet}
         />
 
         {/* Core Capabilities Bento Grid */}

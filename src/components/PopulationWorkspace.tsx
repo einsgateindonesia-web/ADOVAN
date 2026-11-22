@@ -13,7 +13,6 @@ import {
   X,
 } from 'lucide-react';
 import type { ConnectionState } from '../hooks/useRealtimePopulation';
-import type { SpreadsheetInfo } from '../lib/googleSheets';
 import {
   HEALTH_STATUSES,
   PIG_BREEDS,
@@ -26,11 +25,8 @@ import {
   type PopulationEvent,
   type UpdateBatchInput,
 } from '../types/population';
-import {
-  ConfirmMutationModal,
-  type PendingSheetConfirmation,
-} from './ConfirmMutationModal';
-import { GoogleSheetsBar } from './GoogleSheetsBar';
+import { AuthHelpModal, type AuthFailureState } from './AuthHelpModal';
+import { CloudSyncBar } from './CloudSyncBar';
 
 interface PopulationWorkspaceProps {
   batches: PigBatch[];
@@ -46,29 +42,15 @@ interface PopulationWorkspaceProps {
     input: UpdateBatchInput
   ) => Promise<{ ok: boolean; error?: string }>;
   onRemoveBatch: (id: string, actor: string) => Promise<{ ok: boolean; error?: string }>;
-  // Google Sheets props
   user: User | null;
-  hasAccessToken: boolean;
   authBusy: boolean;
-  sheetsAuthBusy: boolean;
   unauthorizedDomain: string | null;
   onDismissUnauthorizedDomain: () => void;
-  sheetInfo: SpreadsheetInfo | null;
-  sheetBusy: boolean;
-  lastSheetSyncAt: string | null;
-  prefilledSheetId: string;
-  pendingConfirmation: PendingSheetConfirmation | null;
-  confirmBusy: boolean;
-  onCancelConfirmation: () => void;
-  onProceedConfirmation: () => void;
+  authFailure: AuthFailureState | null;
+  onDismissAuthFailure: () => void;
+  onOpenAuthHelp: () => void;
   onSignInGoogle: () => Promise<void>;
-  onAuthorizeSheets: () => Promise<void>;
   onSignOutGoogle: () => Promise<void>;
-  onCreateNewSheet: () => Promise<void>;
-  onConnectExistingSheet: (urlOrId: string) => Promise<void>;
-  onChangeActiveTab: (tabName: string) => Promise<void>;
-  onSyncSheetNow: () => Promise<void>;
-  onDisconnectSheet: () => void;
 }
 
 function formatTime(iso: string): string {
@@ -95,27 +77,14 @@ export function PopulationWorkspace({
   onUpdateBatch,
   onRemoveBatch,
   user,
-  hasAccessToken,
   authBusy,
-  sheetsAuthBusy,
   unauthorizedDomain,
   onDismissUnauthorizedDomain,
-  sheetInfo,
-  sheetBusy,
-  lastSheetSyncAt,
-  prefilledSheetId,
-  pendingConfirmation,
-  confirmBusy,
-  onCancelConfirmation,
-  onProceedConfirmation,
+  authFailure,
+  onDismissAuthFailure,
+  onOpenAuthHelp,
   onSignInGoogle,
-  onAuthorizeSheets,
   onSignOutGoogle,
-  onCreateNewSheet,
-  onConnectExistingSheet,
-  onChangeActiveTab,
-  onSyncSheetNow,
-  onDisconnectSheet,
 }: PopulationWorkspaceProps) {
   const [actorName, setActorName] = useState<string>('Petugas Kandang');
   const [phaseFilter, setPhaseFilter] = useState<'Semua' | PigPhase>('Semua');
@@ -278,17 +247,15 @@ export function PopulationWorkspace({
   };
 
   const connectionLabel =
-    connectionState === 'sheets-synced'
-      ? 'Sinkronisasi Google Sheets Aktif'
-      : connectionState === 'cloud-synced'
-        ? 'Sinkronisasi Cloud Real-Time Aktif'
-        : connectionState === 'connected'
-          ? 'Sinkronisasi Server Real-Time Aktif'
-          : connectionState === 'local-sync'
-            ? 'Sinkronisasi Tab Aktif'
-            : connectionState === 'reconnecting'
-              ? 'Menghubungkan Ulang...'
-              : 'Menghubungkan ke Server...';
+    connectionState === 'cloud-synced'
+      ? 'Sinkronisasi Cloud Firebase Aktif'
+      : connectionState === 'connected'
+        ? 'Sinkronisasi Server Real-Time Aktif'
+        : connectionState === 'local-sync'
+          ? 'Sinkronisasi Tab Aktif'
+          : connectionState === 'reconnecting'
+            ? 'Menghubungkan Ulang...'
+            : 'Menghubungkan ke Server...';
 
   return (
     <section id="populasi" className="py-20 border-t border-slate-200 bg-white">
@@ -303,8 +270,8 @@ export function PopulationWorkspace({
               Input &amp; Update Populasi Babi Secara Real-Time
             </h2>
             <p className="mt-3 text-base text-slate-600 leading-relaxed">
-              Setiap penambahan kandang baru atau penyesuaian jumlah ekor langsung tersinkron
-              otomatis antar perangkat dan dapat dihubungkan ke Google Sheets bersama.
+              Setiap penambahan kandang baru atau penyesuaian jumlah ekor langsung tersimpan di
+              Firebase Firestore dan otomatis tersinkron ke seluruh perangkat tim kandang.
             </p>
           </div>
 
@@ -314,7 +281,6 @@ export function PopulationWorkspace({
                 className={`w-2 h-2 rounded-full ${
                   connectionState === 'connected' ||
                   connectionState === 'cloud-synced' ||
-                  connectionState === 'sheets-synced' ||
                   connectionState === 'local-sync'
                     ? 'bg-emerald-600'
                     : 'bg-amber-500 animate-pulse'
@@ -348,27 +314,16 @@ export function PopulationWorkspace({
           </div>
         </div>
 
-        {/* Google Sheets Sync Bar */}
-        <GoogleSheetsBar
+        {/* Firebase Cloud Sync Bar */}
+        <CloudSyncBar
           batches={batches}
           user={user}
-          hasAccessToken={hasAccessToken}
           authBusy={authBusy}
-          sheetsAuthBusy={sheetsAuthBusy}
           unauthorizedDomain={unauthorizedDomain}
           onDismissUnauthorizedDomain={onDismissUnauthorizedDomain}
-          sheetInfo={sheetInfo}
-          sheetBusy={sheetBusy}
-          lastSheetSyncAt={lastSheetSyncAt}
-          prefilledSheetId={prefilledSheetId}
           onSignIn={onSignInGoogle}
-          onAuthorizeSheets={onAuthorizeSheets}
+          onOpenAuthHelp={onOpenAuthHelp}
           onSignOut={onSignOutGoogle}
-          onCreateSpreadsheet={onCreateNewSheet}
-          onConnectSpreadsheet={onConnectExistingSheet}
-          onChangeActiveTab={onChangeActiveTab}
-          onSyncNow={onSyncSheetNow}
-          onDisconnectSheet={onDisconnectSheet}
         />
 
         {errorMessage && (
@@ -953,12 +908,12 @@ export function PopulationWorkspace({
         </div>
       </div>
 
-      {/* Explicit confirmation dialog before any Google Sheets mutation */}
-      <ConfirmMutationModal
-        pending={pendingConfirmation}
-        busy={confirmBusy}
-        onCancel={onCancelConfirmation}
-        onProceed={onProceedConfirmation}
+      {/* Automatic Firebase domain verification & 'Firebase App not verified' guide modal */}
+      <AuthHelpModal
+        failure={authFailure}
+        retrying={authBusy}
+        onClose={onDismissAuthFailure}
+        onRetry={onSignInGoogle}
       />
     </section>
   );
