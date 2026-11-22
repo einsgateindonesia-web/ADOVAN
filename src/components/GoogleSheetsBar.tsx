@@ -123,7 +123,10 @@ export function GoogleSheetsBar({
         ) : (
           <div className="flex items-center gap-3 shrink-0">
             <span className="text-xs text-slate-600 truncate max-w-52">
-              Terhubung: <strong className="text-slate-900">{user?.email || user?.displayName}</strong>
+              Terhubung:{' '}
+              <strong className="text-slate-900">
+                {user?.email || user?.displayName || 'Akun Google Aktif'}
+              </strong>
             </span>
             <button
               type="button"
