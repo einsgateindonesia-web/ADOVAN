@@ -1,20 +1,27 @@
 import { useState } from 'react';
 import type { User } from 'firebase/auth';
 import {
+  AlertCircle,
   Check,
   Copy,
+  Download,
   ExternalLink,
   FileSpreadsheet,
   LogOut,
   RefreshCw,
   Unlink,
 } from 'lucide-react';
-import type { SpreadsheetInfo } from '../lib/googleSheets';
+import { FIREBASE_PROJECT_ID } from '../lib/firebaseAuth';
+import { POPULATION_HEADERS, type SpreadsheetInfo } from '../lib/googleSheets';
+import type { PigBatch } from '../types/population';
 
 interface GoogleSheetsBarProps {
+  batches: PigBatch[];
   user: User | null;
   hasAccessToken: boolean;
   authBusy: boolean;
+  unauthorizedDomain: string | null;
+  onDismissUnauthorizedDomain: () => void;
   sheetInfo: SpreadsheetInfo | null;
   sheetBusy: boolean;
   lastSheetSyncAt: string | null;
@@ -28,10 +35,21 @@ interface GoogleSheetsBarProps {
   onDisconnectSheet: () => void;
 }
 
+function escapeCsvCell(value: string | number): string {
+  const str = String(value ?? '');
+  if (/[",\n\r]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
 export function GoogleSheetsBar({
+  batches,
   user,
   hasAccessToken,
   authBusy,
+  unauthorizedDomain,
+  onDismissUnauthorizedDomain,
   sheetInfo,
   sheetBusy,
   lastSheetSyncAt,
@@ -46,6 +64,7 @@ export function GoogleSheetsBar({
 }: GoogleSheetsBarProps) {
   const [sheetInput, setSheetInput] = useState(prefilledSheetId);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState(false);
 
   const handleCopyShareLink = async () => {
     if (!sheetInfo) return;
@@ -59,6 +78,46 @@ export function GoogleSheetsBar({
     } catch {
       // ignore clipboard errors
     }
+  };
+
+  const handleCopyDomain = async () => {
+    if (!unauthorizedDomain) return;
+    try {
+      await navigator.clipboard.writeText(unauthorizedDomain);
+      setCopiedDomain(true);
+      window.setTimeout(() => setCopiedDomain(false), 2500);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleDownloadCsv = () => {
+    const rows = [
+      POPULATION_HEADERS,
+      ...batches.map((b) => [
+        b.id,
+        b.penName,
+        b.breed,
+        b.phase,
+        b.count,
+        b.avgWeightKg,
+        b.healthStatus,
+        b.notes,
+        b.updatedAt,
+        b.updatedBy,
+      ]),
+    ];
+    const csvContent =
+      '\uFEFF' + rows.map((r) => r.map(escapeCsvCell).join(',')).join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `populasi-babi-bhumi-swana-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const formattedLastSync = lastSheetSyncAt
@@ -76,23 +135,27 @@ export function GoogleSheetsBar({
           <FileSpreadsheet className="w-5 h-5 text-[#164E38] mt-0.5 shrink-0" aria-hidden="true" />
           <div>
             <h3 className="text-sm font-semibold text-slate-900">
-              Sinkronisasi Google Sheets Lintas Perangkat
+              Sinkronisasi Google Sheets &amp; Ekspor Spreadsheet
             </h3>
             <p className="text-xs text-slate-600 mt-0.5">
-              Hubungkan ke satu Google Spreadsheet bersama agar HP, laptop, dan seluruh tim
-              membaca serta memperbarui angka populasi yang sama secara otomatis.
+              Hubungkan ke Google Sheets bersama atau unduh file spreadsheet (.CSV) langsung untuk
+              dibuka di Google Sheets dan Excel.
             </p>
           </div>
         </div>
 
-        {/* Auth state controls */}
-        {!hasAccessToken ? (
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            {prefilledSheetId && (
-              <span className="text-xs text-slate-600 font-mono">
-                ID Sheet Terdeteksi: {prefilledSheetId.slice(0, 12)}...
-              </span>
-            )}
+        {/* Auth + Export controls */}
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={handleDownloadCsv}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Unduh CSV</span>
+          </button>
+
+          {!hasAccessToken ? (
             <button
               type="button"
               disabled={authBusy}
@@ -119,26 +182,85 @@ export function GoogleSheetsBar({
               </svg>
               <span>{authBusy ? 'Menghubungkan...' : 'Sign in with Google'}</span>
             </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="text-xs text-slate-600 truncate max-w-52">
-              Terhubung:{' '}
-              <strong className="text-slate-900">
-                {user?.email || user?.displayName || 'Akun Google Aktif'}
-              </strong>
-            </span>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs text-slate-600 truncate max-w-48">
+                Terhubung:{' '}
+                <strong className="text-slate-900">
+                  {user?.email || user?.displayName || 'Akun Google Aktif'}
+                </strong>
+              </span>
+              <button
+                type="button"
+                onClick={onSignOut}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Keluar</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Clear, actionable guidance when Firebase Authorized Domains needs the preview hostname */}
+      {unauthorizedDomain && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-xs text-amber-950">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" aria-hidden="true" />
+              <div className="space-y-2">
+                <p className="font-semibold">
+                  Domain pratinjau belum diizinkan di Firebase Authentication
+                </p>
+                <p className="text-amber-900 leading-relaxed">
+                  Agar tombol <strong>Sign in with Google</strong> diizinkan oleh Google pada alamat
+                  ini, tambahkan domain berikut ke{' '}
+                  <strong>Authentication → Settings → Authorized domains</strong> di Firebase Console:
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <code className="px-2.5 py-1 bg-white border border-amber-200 rounded font-mono text-[11px] text-slate-900">
+                    {unauthorizedDomain}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={handleCopyDomain}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-amber-300 hover:bg-amber-100 rounded text-[11px] font-medium text-amber-950 cursor-pointer"
+                  >
+                    {copiedDomain ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-700" aria-hidden="true" />
+                        <span>Tersalin</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" aria-hidden="true" />
+                        <span>Salin Domain</span>
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href={`https://console.firebase.google.com/project/${FIREBASE_PROJECT_ID}/authentication/settings`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#164E38] hover:bg-[#113D2B] text-white rounded text-[11px] font-medium"
+                  >
+                    <span>Buka Firebase Console</span>
+                    <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                  </a>
+                </div>
+              </div>
+            </div>
             <button
               type="button"
-              onClick={onSignOut}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+              onClick={onDismissUnauthorizedDomain}
+              className="text-xs font-medium underline hover:no-underline shrink-0 cursor-pointer"
             >
-              <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
-              <span>Keluar</span>
+              Tutup
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Connected spreadsheet toolbar or link/create input */}
       {hasAccessToken && (

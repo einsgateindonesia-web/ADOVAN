@@ -50,6 +50,8 @@ interface PopulationWorkspaceProps {
   user: User | null;
   hasAccessToken: boolean;
   authBusy: boolean;
+  unauthorizedDomain: string | null;
+  onDismissUnauthorizedDomain: () => void;
   sheetInfo: SpreadsheetInfo | null;
   sheetBusy: boolean;
   lastSheetSyncAt: string | null;
@@ -93,6 +95,8 @@ export function PopulationWorkspace({
   user,
   hasAccessToken,
   authBusy,
+  unauthorizedDomain,
+  onDismissUnauthorizedDomain,
   sheetInfo,
   sheetBusy,
   lastSheetSyncAt,
@@ -339,9 +343,12 @@ export function PopulationWorkspace({
 
         {/* Google Sheets Sync Bar */}
         <GoogleSheetsBar
+          batches={batches}
           user={user}
           hasAccessToken={hasAccessToken}
           authBusy={authBusy}
+          unauthorizedDomain={unauthorizedDomain}
+          onDismissUnauthorizedDomain={onDismissUnauthorizedDomain}
           sheetInfo={sheetInfo}
           sheetBusy={sheetBusy}
           lastSheetSyncAt={lastSheetSyncAt}

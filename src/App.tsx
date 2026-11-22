@@ -49,6 +49,8 @@ export default function App() {
     user,
     hasAccessToken,
     authBusy,
+    unauthorizedDomain,
+    dismissUnauthorizedDomain,
     sheetInfo,
     sheetBusy,
     lastSheetSyncAt,
@@ -328,6 +330,8 @@ export default function App() {
           user={user}
           hasAccessToken={hasAccessToken}
           authBusy={authBusy}
+          unauthorizedDomain={unauthorizedDomain}
+          onDismissUnauthorizedDomain={dismissUnauthorizedDomain}
           sheetInfo={sheetInfo}
           sheetBusy={sheetBusy}
           lastSheetSyncAt={lastSheetSyncAt}

@@ -6,6 +6,7 @@ import {
   googleSignIn,
   initAuth,
   logout,
+  UnauthorizedDomainError,
 } from '../lib/firebaseAuth';
 import {
   appendSheetAuditEvent,
@@ -218,6 +219,7 @@ export function useRealtimePopulation() {
   const [user, setUser] = useState<User | null>(null);
   const [hasAccessToken, setHasAccessToken] = useState<boolean>(false);
   const [authBusy, setAuthBusy] = useState<boolean>(false);
+  const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
   const [sheetInfo, setSheetInfo] = useState<SpreadsheetInfo | null>(null);
   const [sheetBusy, setSheetBusy] = useState<boolean>(false);
   const [lastSheetSyncAt, setLastSheetSyncAt] = useState<string | null>(null);
@@ -646,6 +648,7 @@ export function useRealtimePopulation() {
   const signInGoogle = useCallback(async () => {
     setAuthBusy(true);
     setErrorMessage(null);
+    setUnauthorizedDomain(null);
     try {
       const res = await googleSignIn();
       setUser(res.user);
@@ -657,9 +660,13 @@ export function useRealtimePopulation() {
         await connectExistingSheet(targetSheet, res.accessToken);
       }
     } catch (err) {
-      setErrorMessage(
-        err instanceof Error ? err.message : 'Gagal masuk dengan akun Google.'
-      );
+      if (err instanceof UnauthorizedDomainError) {
+        setUnauthorizedDomain(err.hostname);
+      } else {
+        setErrorMessage(
+          err instanceof Error ? err.message : 'Gagal masuk dengan akun Google.'
+        );
+      }
     } finally {
       setAuthBusy(false);
     }
@@ -1187,6 +1194,8 @@ export function useRealtimePopulation() {
     user,
     hasAccessToken,
     authBusy,
+    unauthorizedDomain,
+    dismissUnauthorizedDomain: () => setUnauthorizedDomain(null),
     sheetInfo,
     sheetBusy,
     lastSheetSyncAt,
